@@ -8,7 +8,7 @@ tunnels:
     inspect: false
     # 1. BẢO MẬT: Bắt đăng nhập Username/Password ngay trên trình duyệt
     basic_auth:
-      - "admin:753159@Lmnnml."
+      - "tester159753:753159@Lmnnml."
     # 2. BẢO MẬT: Chỉ cho phép IP của công ty bạn truy cập (Thay IP công ty bạn vào)
     # ip_restriction:
     #   allow_cidrs: [ "113.161.201.128/32" ]
