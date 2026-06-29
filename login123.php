@@ -136,7 +136,7 @@ if (!empty($_SESSION['authenticated'])) {
 
 // --- Thực thi lệnh (AJAX) ---
 if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'exec') {
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
     // CSRF check
     if (!hash_equals($_SESSION['token'] ?? '', $_POST['token'] ?? '')) {
         echo json_encode(['error' => 'Invalid CSRF token']);
@@ -170,7 +170,15 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
     $output = '';
     if (function_exists('proc_open')) {
         $descriptorspec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-        $proc = proc_open($cmd, $descriptorspec, $pipes, $cwd);
+        $env = null;
+        if (PHP_OS_FAMILY === 'Windows') {
+            $env = array_merge(getenv() ?: [], [
+                'PYTHONUTF8' => '1',
+                'PYTHONIOENCODING' => 'utf-8',
+            ]);
+            $cmd = 'chcp 65001 >nul && ' . $cmd;
+        }
+        $proc = proc_open($cmd, $descriptorspec, $pipes, $cwd, $env);
         if (is_resource($proc)) {
             fclose($pipes[0]);
             $output = stream_get_contents($pipes[1]);
@@ -187,7 +195,7 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
     } else {
         $output = "[Lỗi] Không thể thực thi lệnh: proc_open đã bị vô hiệu hóa.";
     }
-    echo json_encode(['output' => $output ?? '', 'cwd' => getcwd()]);
+    echo json_encode(['output' => $output ?? '', 'cwd' => getcwd()], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -256,6 +264,8 @@ $token = $authenticated ? ($_SESSION['token'] ?? '') : '';
             display: flex;
             flex-direction: column;
             height: 100vh;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         /* ---- Scanline overlay ---- */
@@ -278,7 +288,7 @@ $token = $authenticated ? ($_SESSION['token'] ?? '') : '';
         }
 
         .login-box {
-            width: 420px;
+            width: min(92vw, 420px);
             background: var(--bg-panel);
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -296,6 +306,201 @@ $token = $authenticated ? ($_SESSION['token'] ?? '') : '';
             to {
                 opacity: 1;
                 transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1000px) {
+            html,
+            body {
+                height: auto;
+                overflow: auto;
+            }
+
+            .login-wrapper {
+                padding: 20px 0;
+            }
+
+            .login-box {
+                width: min(94vw, 420px);
+                padding: 28px 22px;
+            }
+
+            .shell-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+                padding: 14px 16px;
+            }
+
+            .shell-header-left {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .header-actions {
+                justify-content: flex-start;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .shell-body {
+                flex-direction: column;
+                min-height: 0;
+            }
+
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                padding: 16px;
+            }
+
+            .terminal-wrap {
+                min-height: 48vh;
+            }
+
+            .input-row {
+                flex-wrap: wrap;
+                padding: 12px 16px;
+                gap: 10px;
+            }
+
+            .input-prompt {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            #cmd-input {
+                width: 100%;
+            }
+
+            .run-btn,
+            .clear-btn {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .login-box {
+                padding: 24px 18px;
+            }
+
+            .login-logo h1 {
+                font-size: 1.15rem;
+            }
+
+            .login-logo p {
+                font-size: 0.78rem;
+            }
+
+            .shell-header {
+                padding: 12px 14px;
+            }
+
+            .shell-header-left {
+                justify-content: space-between;
+            }
+
+            .shell-title {
+                font-size: 0.82rem;
+            }
+
+            .header-actions {
+                gap: 8px;
+            }
+
+            .badge {
+                font-size: 0.68rem;
+                padding: 4px 8px;
+            }
+
+            .logout-btn {
+                width: 100%;
+                text-align: center;
+            }
+
+            .sidebar {
+                padding: 14px 14px 12px;
+            }
+
+            .sidebar-title,
+            .info-label {
+                font-size: 0.64rem;
+            }
+
+            .info-value {
+                font-size: 0.7rem;
+            }
+
+            .input-prompt {
+                font-size: 0.8rem;
+            }
+
+            #cmd-input {
+                font-size: 0.88rem;
+            }
+        }
+
+        @media (max-width: 540px) {
+            .login-box {
+                padding: 20px 16px;
+                border-radius: 14px;
+            }
+
+            .login-logo .icon {
+                font-size: 2.4rem;
+            }
+
+            .shell-header {
+                padding: 10px 12px;
+            }
+
+            .shell-body {
+                gap: 12px;
+            }
+
+            .sidebar {
+                padding: 12px 12px 10px;
+            }
+
+            .info-row {
+                gap: 4px;
+            }
+
+            .sidebar-title,
+            .info-label {
+                font-size: 0.62rem;
+            }
+
+            .info-value {
+                font-size: 0.68rem;
+            }
+
+            .input-row {
+                padding: 10px 12px;
+            }
+
+            .run-btn,
+            .clear-btn {
+                padding: 10px;
+            }
+
+            #cmd-input {
+                font-size: 0.85rem;
+            }
+        }
+
+        @media (min-width: 1600px) {
+            .login-box {
+                width: 520px;
+            }
+
+            .sidebar {
+                width: 260px;
+            }
+
+            .terminal-wrap {
+                min-height: 60vh;
             }
         }
 
@@ -636,24 +841,34 @@ $token = $authenticated ? ($_SESSION['token'] ?? '') : '';
             display: flex;
             flex-direction: column;
             margin-bottom: 4px;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .term-prompt {
             color: var(--green);
             font-weight: 600;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .term-cmd {
             color: var(--yellow);
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .term-out {
             color: #c9d1d9;
             white-space: pre-wrap;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .term-error {
             color: var(--red);
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .spinner {
