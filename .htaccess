@@ -1,0 +1,37 @@
+# ============================================================
+#  WebShell - Apache Security Configuration
+# ============================================================
+
+# --- Ẩn sự tồn tại của thư mục: truy cập /remote hoặc /remote/ trả về 404 ---
+DirectoryIndex disabled
+RedirectMatch 404 ^/remote/?$
+
+# --- Chặn truy cập vào .git directory ---
+RedirectMatch 404 /\.git
+
+# --- Chặn truy cập vào các file cấu hình nhạy cảm ---
+# Dùng syntax Apache 2.4 (Require) thay vì 2.2 (Order/Allow/Deny)
+<FilesMatch "^(password\.php|\.env|\.htpasswd|.*\.json|.*\.log|.*\.bak|.*\.sql|.*\.sh)$">
+    Require all denied
+</FilesMatch>
+
+# Trả 404 thay vì 403 cho các file bị chặn (ẩn sự tồn tại)
+ErrorDocument 403 /remote/login123.php
+
+# --- Chặn truy cập thư mục config trực tiếp ---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^config/ - [F,L]
+</IfModule>
+
+# --- Tắt hiển thị danh sách thư mục ---
+Options -Indexes
+
+# --- Ngăn MIME-type sniffing ---
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "no-referrer"
+    # Bỏ comment dòng dưới nếu dùng HTTPS
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</IfModule>

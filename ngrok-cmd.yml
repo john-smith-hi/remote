@@ -1,0 +1,14 @@
+version: "3"
+agent:
+  authtoken: 3FnDoi4ILIjfVehjZMqeB6FdBOl_39TVskV1oG38sGaWYKF9r
+tunnels:
+  cmd-secure:
+    proto: http
+    addr: http://localhost:80/
+    inspect: false
+    # 1. BẢO MẬT: Bắt đăng nhập Username/Password ngay trên trình duyệt
+    basic_auth:
+      - "admin:753159@Lmnnml."
+    # 2. BẢO MẬT: Chỉ cho phép IP của công ty bạn truy cập (Thay IP công ty bạn vào)
+    # ip_restriction:
+    #   allow_cidrs: [ "11.22.33.44/32" ]
