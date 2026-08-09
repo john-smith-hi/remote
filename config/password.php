@@ -26,8 +26,8 @@ define('SESSION_TIMEOUT', 1800);
 
 // IP whitelist - để trống array() để cho phép tất cả IP
 // Ví dụ: array('127.0.0.1', '192.168.1.100')
-// Dùng const (PHP 5.6+) thay vì define() với mảng (chỉ PHP 7.0+)
-const IP_WHITELIST = array();
+// Dùng biến (tương thích PHP cũ; hằng số mảng cần PHP 5.6+)
+$IP_WHITELIST = array();
 
 // Số lần đăng nhập sai tối đa
 define('MAX_FAILED_ATTEMPTS', 5);

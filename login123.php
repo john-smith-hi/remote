@@ -118,11 +118,12 @@ session_start();
 // --- Kiểm tra IP Whitelist ---
 function check_ip_whitelist()
 {
-    if (!defined('IP_WHITELIST') || empty(IP_WHITELIST)) {
+    global $IP_WHITELIST;
+    if (empty($IP_WHITELIST) || !is_array($IP_WHITELIST)) {
         return true;
     }
     $client_ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
-    return in_array($client_ip, IP_WHITELIST, true);
+    return in_array($client_ip, $IP_WHITELIST, true);
 }
 
 // --- Quản lý đăng nhập thất bại ---
