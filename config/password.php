@@ -24,9 +24,10 @@ define('SESSION_NAME', 'wsh_s3ss10n_' . substr(hash('sha256', __FILE__), 0, 8));
 // Thời gian timeout phiên (giây) - mặc định 30 phút
 define('SESSION_TIMEOUT', 1800);
 
-// IP whitelist - để trống [] để cho phép tất cả IP
-// Ví dụ: ['127.0.0.1', '192.168.1.100']
-define('IP_WHITELIST', []);
+// IP whitelist - để trống array() để cho phép tất cả IP
+// Ví dụ: array('127.0.0.1', '192.168.1.100')
+// Dùng const (PHP 5.6+) thay vì define() với mảng (chỉ PHP 7.0+)
+const IP_WHITELIST = array();
 
 // Số lần đăng nhập sai tối đa
 define('MAX_FAILED_ATTEMPTS', 5);
