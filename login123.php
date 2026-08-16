@@ -1219,9 +1219,9 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
                     <div class="sidebar-title">Thư mục hiện tại</div>
                     <div id="current-path"><?= htmlspecialchars(getcwd()) ?></div>
                     <div class="quick-links">
-                        <a href="#" onclick="return goQuickPath(this)" data-path="C:\Users\Administrator\Desktop\trade">
+                        <a href="#" onclick="return goQuickPath(this)" data-path="C:\Users\Administrator\Desktop\shared\trade">
                             <span class="ql-label">Liên kết nhanh</span>
-                            C:\Users\Administrator\Desktop\trade
+                            C:\Users\Administrator\Desktop\shared\trade
                         </a>
                     </div>
                 </div>
