@@ -964,6 +964,8 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             white-space: pre-wrap;
             word-break: break-all;
             color: #c9d1d9;
+            font-variant-ligatures: none;
+            font-feature-settings: "liga" 0, "calt" 0;
         }
 
         #terminal-output::-webkit-scrollbar {
@@ -1067,6 +1069,8 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
             caret-color: var(--green);
+            font-variant-ligatures: none;
+            font-feature-settings: "liga" 0, "calt" 0;
         }
 
         #cmd-input::placeholder {
@@ -1262,7 +1266,9 @@ Gõ lệnh bên dưới và nhấn Enter hoặc click [RUN]
                 </div>
                 <div class="input-row">
                     <span class="input-prompt" id="prompt-text">$ &nbsp;</span>
-                    <input type="text" id="cmd-input" placeholder="Gõ lệnh shell..." autofocus spellcheck="false" autocomplete="off">
+                    <input type="text" id="cmd-input" placeholder="Gõ lệnh shell..." autofocus
+                        spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"
+                        data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
                     <button class="clear-btn" onclick="clearTerminal()" title="Xóa màn hình">CLR</button>
                     <button class="run-btn" id="run-btn" onclick="runCommand()">▶ RUN</button>
                 </div>
@@ -1337,9 +1343,18 @@ Gõ lệnh bên dưới và nhấn Enter hoặc click [RUN]
                 return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             }
 
+            // Giữ nguyên dấu - / -- ASCII; đổi smart-dash (— – − …) về '-'
+            function normalizeCmdDashes(s) {
+                return String(s).replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
+            }
+
+            function getCmdValue() {
+                return normalizeCmdDashes(inputEl.value);
+            }
+
             function runCommand() {
                 if (is_running) return;
-                const cmd = inputEl.value.trim();
+                const cmd = getCmdValue().trim();
                 if (!cmd) return;
 
                 // Lịch sử
@@ -1400,6 +1415,38 @@ Gõ lệnh bên dưới và nhấn Enter hoặc click [RUN]
                         inputEl.focus();
                     });
             }
+
+            // Không cho trình duyệt/IME chèn smart-dash thay vì '-'
+            inputEl.addEventListener('beforeinput', function(e) {
+                if (!e.data) return;
+                if (/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63\uFF0D]/.test(e.data)) {
+                    e.preventDefault();
+                    const start = inputEl.selectionStart;
+                    const end = inputEl.selectionEnd;
+                    const fixed = normalizeCmdDashes(e.data);
+                    const v = inputEl.value;
+                    inputEl.value = v.slice(0, start) + fixed + v.slice(end);
+                    const pos = start + fixed.length;
+                    inputEl.setSelectionRange(pos, pos);
+                }
+            });
+
+            inputEl.addEventListener('paste', function(e) {
+                e.preventDefault();
+                var text = '';
+                if (e.clipboardData) {
+                    text = e.clipboardData.getData('text/plain') || '';
+                } else if (window.clipboardData) {
+                    text = window.clipboardData.getData('Text') || '';
+                }
+                text = normalizeCmdDashes(text);
+                var start = inputEl.selectionStart;
+                var end = inputEl.selectionEnd;
+                var v = inputEl.value;
+                inputEl.value = v.slice(0, start) + text + v.slice(end);
+                var pos = start + text.length;
+                inputEl.setSelectionRange(pos, pos);
+            });
 
             // Xử lý phím
             inputEl.addEventListener('keydown', function(e) {
