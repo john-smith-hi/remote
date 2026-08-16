@@ -342,15 +342,22 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #121417;
-            --bg-panel: #1a1d21;
-            --bg-input: #22262b;
-            --border: #2e3338;
-            --accent: #8b949e;
-            --red: #c45c5c;
-            --text-main: #d0d4d8;
-            --text-dim: #8b949e;
-            --text-muted: #5c6370;
+            --bg-dark: #0a0c10;
+            --bg-panel: #0d1117;
+            --bg-card: #161b22;
+            --bg-input: #1c2128;
+            --border: #30363d;
+            --border-glow: #00ff9d22;
+            --green: #00ff9d;
+            --green-dim: #00cc7a;
+            --green-dark: #003d25;
+            --red: #ff4757;
+            --yellow: #ffd32a;
+            --blue: #4fc3f7;
+            --text-main: #e6edf3;
+            --text-dim: #7d8590;
+            --text-muted: #484f58;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         }
 
         *,
@@ -378,21 +385,45 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             -webkit-user-select: text;
         }
 
+        /* ---- Scanline overlay ---- */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 157, 0.015) 2px, rgba(0, 255, 157, 0.015) 4px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
         /* ============ LOGIN PAGE ============ */
         .login-wrapper {
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100vh;
-            background: var(--bg-dark);
+            background: radial-gradient(ellipse at 50% 40%, #00ff9d08 0%, transparent 70%), var(--bg-dark);
         }
 
         .login-box {
-            width: min(92vw, 400px);
+            width: min(92vw, 420px);
             background: var(--bg-panel);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 32px;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: var(--shadow), 0 0 60px rgba(0, 255, 157, 0.06);
+            animation: fadeSlideIn 0.4s ease;
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         @media (max-width: 1000px) {
@@ -530,11 +561,11 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         @media (max-width: 540px) {
             .login-box {
                 padding: 20px 16px;
-                border-radius: 6px;
+                border-radius: 14px;
             }
 
             .login-logo .icon {
-                font-size: 1.6rem;
+                font-size: 2.4rem;
             }
 
             .shell-header {
@@ -542,7 +573,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             }
 
             .shell-body {
-                gap: 0;
+                gap: 12px;
             }
 
             .sidebar {
@@ -578,11 +609,11 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
 
         @media (min-width: 1600px) {
             .login-box {
-                width: 480px;
+                width: 520px;
             }
 
             .sidebar {
-                width: 240px;
+                width: 260px;
             }
 
             .terminal-wrap {
@@ -592,31 +623,31 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
 
         .login-logo {
             text-align: center;
-            margin-bottom: 28px;
+            margin-bottom: 32px;
         }
 
         .login-logo .icon {
-            font-size: 1.5rem;
+            font-size: 3rem;
             margin-bottom: 8px;
-            color: var(--text-dim);
+            filter: drop-shadow(0 0 16px var(--green));
         }
 
         .login-logo h1 {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.15rem;
-            font-weight: 600;
-            color: var(--text-main);
-            letter-spacing: 1px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--green);
+            letter-spacing: 2px;
         }
 
         .login-logo p {
-            color: var(--text-muted);
+            color: var(--text-dim);
             font-size: 0.8rem;
             margin-top: 6px;
         }
 
         .form-group {
-            margin-bottom: 18px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
@@ -625,62 +656,76 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             font-size: 0.78rem;
             font-weight: 500;
             color: var(--text-dim);
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
 
         .form-group input {
             width: 100%;
-            padding: 11px 14px;
+            padding: 12px 16px;
             background: var(--bg-input);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 8px;
             color: var(--text-main);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .form-group input:focus {
-            border-color: var(--accent);
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(0, 255, 157, 0.1);
         }
 
         .login-btn {
             width: 100%;
-            padding: 12px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--text-main);
-            font-weight: 600;
-            font-size: 0.9rem;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--green), var(--green-dim));
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: 1px;
             cursor: pointer;
+            transition: all 0.2s;
             font-family: 'JetBrains Mono', monospace;
         }
 
         .login-btn:hover {
-            border-color: var(--accent);
-            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(0, 255, 157, 0.35);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
         }
 
         .login-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
 
         .error-msg {
-            background: rgba(196, 92, 92, 0.1);
-            border: 1px solid rgba(196, 92, 92, 0.35);
-            border-radius: 4px;
-            padding: 10px 14px;
+            background: rgba(255, 71, 87, 0.12);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
             color: var(--red);
             font-size: 0.85rem;
-            margin-bottom: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .sha-note {
-            margin-top: 18px;
-            padding: 10px;
+            margin-top: 20px;
+            padding: 12px;
             background: var(--bg-input);
-            border-radius: 4px;
+            border-radius: 8px;
             font-size: 0.75rem;
             color: var(--text-muted);
             font-family: 'JetBrains Mono', monospace;
@@ -708,6 +753,29 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             gap: 12px;
         }
 
+        .traffic-lights {
+            display: flex;
+            gap: 6px;
+        }
+
+        .traffic-lights span {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .tl-red {
+            background: #ff5f57;
+        }
+
+        .tl-yellow {
+            background: #febc2e;
+        }
+
+        .tl-green {
+            background: #28c840;
+        }
+
         .shell-title {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
@@ -715,7 +783,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         }
 
         .shell-title strong {
-            color: var(--text-main);
+            color: var(--green);
         }
 
         .header-actions {
@@ -725,30 +793,41 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         }
 
         .badge {
-            padding: 3px 8px;
-            border-radius: 3px;
+            padding: 4px 10px;
+            border-radius: 20px;
             font-size: 0.72rem;
-            font-weight: 500;
+            font-weight: 600;
             font-family: 'JetBrains Mono', monospace;
-            background: var(--bg-input);
-            color: var(--text-dim);
-            border: 1px solid var(--border);
+            letter-spacing: 0.5px;
+        }
+
+        .badge-green {
+            background: var(--green-dark);
+            color: var(--green);
+            border: 1px solid rgba(0, 255, 157, 0.2);
+        }
+
+        .badge-blue {
+            background: rgba(79, 195, 247, 0.1);
+            color: var(--blue);
+            border: 1px solid rgba(79, 195, 247, 0.2);
         }
 
         .logout-btn {
-            padding: 6px 12px;
-            border-radius: 3px;
+            padding: 6px 14px;
+            border-radius: 6px;
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text-dim);
             font-size: 0.8rem;
             cursor: pointer;
+            transition: all 0.2s;
             font-family: 'Inter', sans-serif;
         }
 
         .logout-btn:hover {
-            border-color: var(--accent);
-            color: var(--text-main);
+            border-color: var(--red);
+            color: var(--red);
         }
 
         .shell-body {
@@ -757,6 +836,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             overflow: hidden;
         }
 
+        /* ---- Sidebar info ---- */
         .sidebar {
             width: 220px;
             flex-shrink: 0;
@@ -773,7 +853,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         .sidebar-title {
             font-size: 0.68rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             color: var(--text-muted);
             margin-bottom: 10px;
             font-weight: 600;
@@ -798,10 +878,38 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             word-break: break-all;
         }
 
+        .info-value.green {
+            color: var(--green);
+        }
+
+        .online-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(0, 255, 157, 0.4);
+            }
+
+            50% {
+                opacity: 0.8;
+                box-shadow: 0 0 0 5px rgba(0, 255, 157, 0);
+            }
+        }
+
         #current-path {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.7rem;
-            color: var(--text-dim);
+            color: var(--yellow);
             word-break: break-all;
         }
 
@@ -813,18 +921,20 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             display: block;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.68rem;
-            color: var(--text-dim);
+            color: var(--green);
             text-decoration: none;
-            border: 1px solid var(--border);
-            border-radius: 3px;
+            border: 1px solid rgba(0, 255, 157, 0.25);
+            border-radius: 6px;
             padding: 6px 8px;
             word-break: break-all;
             line-height: 1.4;
+            background: var(--green-dark);
+            transition: all 0.2s;
         }
 
         .quick-links a:hover {
-            border-color: var(--accent);
-            color: var(--text-main);
+            box-shadow: 0 0 12px rgba(0, 255, 157, 0.2);
+            border-color: rgba(0, 255, 157, 0.4);
         }
 
         .quick-links .ql-label {
@@ -835,6 +945,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             font-family: 'Inter', sans-serif;
         }
 
+        /* ---- Terminal area ---- */
         .terminal-wrap {
             flex: 1;
             display: flex;
@@ -852,7 +963,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             background: var(--bg-dark);
             white-space: pre-wrap;
             word-break: break-all;
-            color: var(--text-main);
+            color: #c9d1d9;
         }
 
         #terminal-output::-webkit-scrollbar {
@@ -870,7 +981,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
 
         .term-welcome {
             margin-bottom: 12px;
-            color: var(--text-dim);
+            color: var(--green);
             border-bottom: 1px solid var(--border);
             padding-bottom: 12px;
         }
@@ -884,20 +995,20 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         }
 
         .term-prompt {
-            color: var(--text-dim);
+            color: var(--green);
             font-weight: 600;
             user-select: text;
             -webkit-user-select: text;
         }
 
         .term-cmd {
-            color: var(--text-main);
+            color: var(--yellow);
             user-select: text;
             -webkit-user-select: text;
         }
 
         .term-out {
-            color: var(--text-main);
+            color: #c9d1d9;
             white-space: pre-wrap;
             user-select: text;
             -webkit-user-select: text;
@@ -914,7 +1025,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             width: 10px;
             height: 10px;
             border: 2px solid var(--text-muted);
-            border-top-color: var(--text-main);
+            border-top-color: var(--green);
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
             margin-right: 6px;
@@ -927,6 +1038,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             }
         }
 
+        /* ---- Input row ---- */
         .input-row {
             display: flex;
             align-items: center;
@@ -940,7 +1052,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         .input-prompt {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
-            color: var(--text-dim);
+            color: var(--green);
             white-space: nowrap;
             font-weight: 600;
             flex-shrink: 0;
@@ -951,10 +1063,10 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             background: transparent;
             border: none;
             outline: none;
-            color: var(--text-main);
+            color: var(--yellow);
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
-            caret-color: var(--text-main);
+            caret-color: var(--green);
         }
 
         #cmd-input::placeholder {
@@ -962,20 +1074,22 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         }
 
         .run-btn {
-            padding: 8px 16px;
-            border-radius: 3px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            color: var(--text-main);
+            padding: 8px 18px;
+            border-radius: 6px;
+            background: var(--green-dark);
+            border: 1px solid rgba(0, 255, 157, 0.25);
+            color: var(--green);
             font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
+            transition: all 0.2s;
             font-family: 'JetBrains Mono', monospace;
             flex-shrink: 0;
         }
 
         .run-btn:hover {
-            border-color: var(--accent);
+            background: rgba(0, 255, 157, 0.15);
+            box-shadow: 0 0 12px rgba(0, 255, 157, 0.2);
         }
 
         .run-btn:disabled {
@@ -985,18 +1099,19 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
 
         .clear-btn {
             padding: 8px 12px;
-            border-radius: 3px;
+            border-radius: 6px;
             background: var(--bg-input);
             border: 1px solid var(--border);
             color: var(--text-dim);
             font-size: 0.8rem;
             cursor: pointer;
+            transition: all 0.2s;
             font-family: 'JetBrains Mono', monospace;
             flex-shrink: 0;
         }
 
         .clear-btn:hover {
-            border-color: var(--accent);
+            border-color: var(--text-dim);
             color: var(--text-main);
         }
     </style>
@@ -1008,12 +1123,12 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         <div class="login-wrapper">
             <div class="login-box">
                 <div class="login-logo">
-                    <div class="icon">$</div>
+                    <div class="icon">🖥️</div>
                     <h1>WEBSHELL</h1>
-                    <p>Remote Terminal Access</p>
+                    <p>Secure Remote Terminal Access</p>
                 </div>
                 <?php if ($error_msg): ?>
-                    <div class="error-msg"><?= htmlspecialchars($error_msg) ?></div>
+                    <div class="error-msg">⚠️ <?= htmlspecialchars($error_msg) ?></div>
                 <?php endif; ?>
                 <form method="POST" autocomplete="off">
                     <input type="hidden" name="action" value="login">
@@ -1025,9 +1140,9 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
                     </div>
                     <button type="submit" class="login-btn" <?= $login_locked ? 'disabled' : '' ?>>
                         <?php if ($login_locked): ?>
-                            Bị khóa <?= $lock_remaining ?>s
+                            🔒 Bị khóa <?= $lock_remaining ?>s
                         <?php else: ?>
-                            Đăng nhập
+                            → ĐĂNG NHẬP
                         <?php endif; ?>
                     </button>
                 </form>
@@ -1049,7 +1164,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
                             location.reload();
                             return;
                         }
-                        btn.textContent = 'Bị khóa ' + remaining + 's';
+                        btn.textContent = '🔒 Bị khóa ' + remaining + 's';
                     }, 1000);
                 })();
             </script>
@@ -1059,15 +1174,21 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
         <!-- ==================== SHELL PAGE ==================== -->
         <div class="shell-header">
             <div class="shell-header-left">
+                <div class="traffic-lights">
+                    <span class="tl-red"></span>
+                    <span class="tl-yellow"></span>
+                    <span class="tl-green"></span>
+                </div>
                 <div class="shell-title">
                     <strong>WebShell</strong> :: <?= htmlspecialchars($sys_info['os']) ?>
                 </div>
             </div>
             <div class="header-actions">
-                <span class="badge">PHP <?= PHP_MAJOR_VERSION ?>.<?= PHP_MINOR_VERSION ?></span>
+                <span class="badge badge-green"><span class="online-dot"></span>LIVE</span>
+                <span class="badge badge-blue">PHP <?= PHP_MAJOR_VERSION ?>.<?= PHP_MINOR_VERSION ?>.*</span>
                 <form method="POST" style="display:inline">
                     <input type="hidden" name="action" value="logout">
-                    <button type="submit" class="logout-btn">Đăng xuất</button>
+                    <button type="submit" class="logout-btn">⏻ Đăng xuất</button>
                 </form>
             </div>
         </div>
@@ -1083,7 +1204,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
                     </div>
                     <div class="info-row">
                         <span class="info-label">PHP</span>
-                        <span class="info-value"><?= PHP_VERSION ?></span>
+                        <span class="info-value green"><?= PHP_VERSION ?></span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">User</span>
@@ -1107,15 +1228,15 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
                 <div class="sidebar-section">
                     <div class="sidebar-title">Phím tắt</div>
                     <div class="info-row">
-                        <span class="info-label">↑↓</span>
+                        <span class="info-label" style="color:var(--yellow)">↑↓</span>
                         <span class="info-value" style="font-size:0.68rem">Lịch sử lệnh</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Enter</span>
+                        <span class="info-label" style="color:var(--yellow)">Enter</span>
                         <span class="info-value" style="font-size:0.68rem">Thực thi</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Ctrl+L</span>
+                        <span class="info-label" style="color:var(--yellow)">Ctrl+L</span>
                         <span class="info-value" style="font-size:0.68rem">Xóa màn hình</span>
                     </div>
                 </div>
@@ -1124,7 +1245,13 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             <!-- Terminal -->
             <div class="terminal-wrap">
                 <div id="terminal-output">
-                    <div class="term-welcome">WebShell | <?= htmlspecialchars($sys_info['os']) ?>
+                    <div class="term-welcome"> __        __   _        ____  _          _ _
+                        \ \      / /__| |__    / ___|| |__   ___| | |
+                         \ \ /\ / / _ \ '_ \   \___ \| '_ \ / _ \ | |
+                          \ V  V /  __/ |_) |   ___) | | | |  __/ | |
+                           \_/\_/ \___|_.__/   |____/|_| |_|\___|_|_|
+
+Secure Remote Terminal | <?= htmlspecialchars($sys_info['os']) ?>
 
 Người dùng : <?= htmlspecialchars($sys_info['user']) ?>
 Thời gian : <?= $sys_info['time'] ?>
@@ -1137,7 +1264,7 @@ Gõ lệnh bên dưới và nhấn Enter hoặc click [RUN]
                     <span class="input-prompt" id="prompt-text">$ &nbsp;</span>
                     <input type="text" id="cmd-input" placeholder="Gõ lệnh shell..." autofocus spellcheck="false" autocomplete="off">
                     <button class="clear-btn" onclick="clearTerminal()" title="Xóa màn hình">CLR</button>
-                    <button class="run-btn" id="run-btn" onclick="runCommand()">RUN</button>
+                    <button class="run-btn" id="run-btn" onclick="runCommand()">▶ RUN</button>
                 </div>
             </div>
         </div>
