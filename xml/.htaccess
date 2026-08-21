@@ -1,0 +1,3 @@
+# Chặn truy cập trực tiếp vào thư mục xml từ trình duyệt
+Order deny,allow
+Deny from all

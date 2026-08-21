@@ -152,6 +152,78 @@ function reset_attempts()
     }
 }
 
+// --- Quick links (XML) ---
+function wsh_quicklinks_file()
+{
+    return dirname(__FILE__) . '/xml/quicklinks.xml';
+}
+
+function wsh_load_quicklinks()
+{
+    $file = wsh_quicklinks_file();
+    if (!file_exists($file)) {
+        $defaults = array(
+            array(
+                'id'   => '1',
+                'name' => 'Trade',
+                'cmd'  => 'cd C:\\Users\\Administrator\\Desktop\\shared\\trade',
+            ),
+        );
+        wsh_save_quicklinks($defaults);
+        return $defaults;
+    }
+    $xml = @simplexml_load_file($file);
+    if ($xml === false) {
+        return array();
+    }
+    $links = array();
+    foreach ($xml->link as $link) {
+        // Ưu tiên <cmd>; tương thích cũ nếu còn <path>
+        $cmd = isset($link->cmd) ? (string) $link->cmd : '';
+        if ($cmd === '' && isset($link->path)) {
+            $cmd = 'cd ' . (string) $link->path;
+        }
+        $links[] = array(
+            'id'   => (string) $link['id'],
+            'name' => (string) $link->name,
+            'cmd'  => $cmd,
+        );
+    }
+    return $links;
+}
+
+function wsh_save_quicklinks($links)
+{
+    $dom = new DOMDocument('1.0', 'UTF-8');
+    $dom->formatOutput = true;
+    $root = $dom->createElement('quicklinks');
+    $dom->appendChild($root);
+    foreach ($links as $link) {
+        $el = $dom->createElement('link');
+        $el->setAttribute('id', (string) $link['id']);
+        $nameEl = $dom->createElement('name');
+        $nameEl->appendChild($dom->createTextNode($link['name']));
+        $el->appendChild($nameEl);
+        $cmdEl = $dom->createElement('cmd');
+        $cmdEl->appendChild($dom->createTextNode($link['cmd']));
+        $el->appendChild($cmdEl);
+        $root->appendChild($el);
+    }
+    return $dom->save(wsh_quicklinks_file()) !== false;
+}
+
+function wsh_next_quicklink_id($links)
+{
+    $max = 0;
+    foreach ($links as $link) {
+        $id = (int) $link['id'];
+        if ($id > $max) {
+            $max = $id;
+        }
+    }
+    return (string) ($max + 1);
+}
+
 // Kiểm tra IP
 if (!check_ip_whitelist()) {
     if (function_exists('http_response_code')) {
@@ -314,8 +386,75 @@ if ($authenticated && isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_MET
     exit;
 }
 
+// --- Quản lý quick links (AJAX) ---
+if ($authenticated && isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $ql_action = $_POST['action'];
+    if ($ql_action === 'quicklink_add' || $ql_action === 'quicklink_delete' || $ql_action === 'quicklink_list') {
+        header('Content-Type: application/json; charset=utf-8');
+        $json_flags = defined('JSON_UNESCAPED_UNICODE') ? JSON_UNESCAPED_UNICODE : 0;
+        $session_token = isset($_SESSION['token']) ? $_SESSION['token'] : '';
+        $post_token = isset($_POST['token']) ? $_POST['token'] : '';
+        if (!hash_equals($session_token, $post_token)) {
+            echo json_encode(array('ok' => false, 'error' => 'Invalid CSRF token'), $json_flags);
+            exit;
+        }
+
+        if ($ql_action === 'quicklink_list') {
+            echo json_encode(array('ok' => true, 'links' => wsh_load_quicklinks()), $json_flags);
+            exit;
+        }
+
+        if ($ql_action === 'quicklink_add') {
+            $name = isset($_POST['name']) ? trim($_POST['name']) : '';
+            $cmd = isset($_POST['cmd']) ? trim($_POST['cmd']) : '';
+            if ($name === '' || $cmd === '') {
+                echo json_encode(array('ok' => false, 'error' => 'Tên và lệnh không được trống'), $json_flags);
+                exit;
+            }
+            if (strlen($name) > 80 || strlen($cmd) > 1000) {
+                echo json_encode(array('ok' => false, 'error' => 'Tên hoặc lệnh quá dài'), $json_flags);
+                exit;
+            }
+            $links = wsh_load_quicklinks();
+            $links[] = array(
+                'id'   => wsh_next_quicklink_id($links),
+                'name' => $name,
+                'cmd'  => $cmd,
+            );
+            if (!wsh_save_quicklinks($links)) {
+                echo json_encode(array('ok' => false, 'error' => 'Không ghi được file XML'), $json_flags);
+                exit;
+            }
+            echo json_encode(array('ok' => true, 'links' => $links), $json_flags);
+            exit;
+        }
+
+        if ($ql_action === 'quicklink_delete') {
+            $id = isset($_POST['id']) ? (string) $_POST['id'] : '';
+            if ($id === '') {
+                echo json_encode(array('ok' => false, 'error' => 'Thiếu id'), $json_flags);
+                exit;
+            }
+            $links = wsh_load_quicklinks();
+            $filtered = array();
+            foreach ($links as $link) {
+                if ((string) $link['id'] !== $id) {
+                    $filtered[] = $link;
+                }
+            }
+            if (!wsh_save_quicklinks($filtered)) {
+                echo json_encode(array('ok' => false, 'error' => 'Không ghi được file XML'), $json_flags);
+                exit;
+            }
+            echo json_encode(array('ok' => true, 'links' => $filtered), $json_flags);
+            exit;
+        }
+    }
+}
+
 // --- Thông tin hệ thống ---
 $sys_info = array();
+$quick_links = array();
 if ($authenticated) {
     $sys_info = array(
         'os'   => PHP_OS_FAMILY . ' (' . php_uname('m') . ')',
@@ -328,6 +467,7 @@ if ($authenticated) {
     if (!isset($_SESSION['cwd'])) {
         $_SESSION['cwd'] = getcwd();
     }
+    $quick_links = wsh_load_quicklinks();
 }
 $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : '';
 ?>
@@ -838,7 +978,7 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
 
         /* ---- Sidebar info ---- */
         .sidebar {
-            width: 220px;
+            width: 240px;
             flex-shrink: 0;
             background: var(--bg-panel);
             border-right: 1px solid var(--border);
@@ -915,9 +1055,19 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
 
         .quick-links {
             margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        .quick-links a {
+        .ql-item {
+            display: flex;
+            align-items: stretch;
+            gap: 4px;
+        }
+
+        .ql-item a {
+            flex: 1;
             display: block;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.68rem;
@@ -930,9 +1080,10 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             line-height: 1.4;
             background: var(--green-dark);
             transition: all 0.2s;
+            min-width: 0;
         }
 
-        .quick-links a:hover {
+        .ql-item a:hover {
             box-shadow: 0 0 12px rgba(0, 255, 157, 0.2);
             border-color: rgba(0, 255, 157, 0.4);
         }
@@ -943,6 +1094,87 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
             color: var(--text-muted);
             margin-bottom: 2px;
             font-family: 'Inter', sans-serif;
+        }
+
+        .ql-cmd {
+            display: block;
+            color: var(--green);
+        }
+
+        .ql-del {
+            flex-shrink: 0;
+            width: 26px;
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            border-radius: 6px;
+            background: rgba(255, 71, 87, 0.08);
+            color: var(--red);
+            cursor: pointer;
+            font-size: 0.95rem;
+            line-height: 1;
+            padding: 0;
+            transition: all 0.2s;
+        }
+
+        .ql-del:hover {
+            background: rgba(255, 71, 87, 0.2);
+            border-color: var(--red);
+        }
+
+        .ql-form {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .ql-form input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 8px;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            outline: none;
+        }
+
+        .ql-form input:focus {
+            border-color: rgba(0, 255, 157, 0.4);
+        }
+
+        .ql-form input::placeholder {
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .ql-add-btn {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 255, 157, 0.3);
+            background: var(--green-dark);
+            color: var(--green);
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .ql-add-btn:hover {
+            box-shadow: 0 0 10px rgba(0, 255, 157, 0.15);
+            border-color: rgba(0, 255, 157, 0.5);
+        }
+
+        .ql-add-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .ql-empty {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-style: italic;
         }
 
         /* ---- Terminal area ---- */
@@ -1222,11 +1454,26 @@ $token = ($authenticated && isset($_SESSION['token'])) ? $_SESSION['token'] : ''
                 <div class="sidebar-section">
                     <div class="sidebar-title">Thư mục hiện tại</div>
                     <div id="current-path"><?= htmlspecialchars(getcwd()) ?></div>
-                    <div class="quick-links">
-                        <a href="#" onclick="return goQuickPath(this)" data-path="C:\Users\Administrator\Desktop\shared\trade">
-                            <span class="ql-label">Liên kết nhanh</span>
-                            C:\Users\Administrator\Desktop\shared\trade
-                        </a>
+                    <div class="sidebar-title" style="margin-top:14px">Lệnh tắt</div>
+                    <div class="quick-links" id="quick-links">
+                        <?php if (empty($quick_links)): ?>
+                            <div class="ql-empty">Chưa có lệnh tắt</div>
+                        <?php else: ?>
+                            <?php foreach ($quick_links as $ql): ?>
+                                <div class="ql-item" data-id="<?= htmlspecialchars($ql['id']) ?>">
+                                    <a href="#" onclick="return runQuickCmd(this)" data-cmd="<?= htmlspecialchars($ql['cmd']) ?>">
+                                        <span class="ql-label"><?= htmlspecialchars($ql['name']) ?></span>
+                                        <span class="ql-cmd"><?= htmlspecialchars($ql['cmd']) ?></span>
+                                    </a>
+                                    <button type="button" class="ql-del" title="Xóa" onclick="deleteQuickLink('<?= htmlspecialchars($ql['id'], ENT_QUOTES) ?>')">&times;</button>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ql-form">
+                        <input type="text" id="ql-name" placeholder="Tên (vd: Trade)" maxlength="80" autocomplete="off">
+                        <input type="text" id="ql-cmd" placeholder="Lệnh CMD (vd: dir /w)" maxlength="1000" autocomplete="off">
+                        <button type="button" class="ql-add-btn" id="ql-add-btn" onclick="addQuickLink()">+ Thêm lệnh tắt</button>
                     </div>
                 </div>
                 <div class="sidebar-section">
@@ -1281,12 +1528,17 @@ Gõ lệnh bên dưới và nhấn Enter hoặc click [RUN]
             let history_idx = -1;
             let is_running = false;
             let current_cwd = <?= json_encode(getcwd()) ?>;
+            let quickLinks = <?= json_encode($quick_links, defined('JSON_UNESCAPED_UNICODE') ? JSON_UNESCAPED_UNICODE : 0) ?>;
 
             const outputEl = document.getElementById('terminal-output');
             const inputEl = document.getElementById('cmd-input');
             const runBtn = document.getElementById('run-btn');
             const pathEl = document.getElementById('current-path');
             const promptEl = document.getElementById('prompt-text');
+            const quickLinksEl = document.getElementById('quick-links');
+            const qlNameEl = document.getElementById('ql-name');
+            const qlCmdEl = document.getElementById('ql-cmd');
+            const qlAddBtn = document.getElementById('ql-add-btn');
 
             function updatePrompt(cwd) {
                 current_cwd = cwd;
@@ -1297,14 +1549,109 @@ Gõ lệnh bên dưới và nhấn Enter hoặc click [RUN]
                 promptEl.textContent = short + ' $ ';
             }
 
-            function goQuickPath(el) {
+            function renderQuickLinks(links) {
+                quickLinks = Array.isArray(links) ? links : [];
+                if (!quickLinksEl) return;
+                if (quickLinks.length === 0) {
+                    quickLinksEl.innerHTML = '<div class="ql-empty">Chưa có lệnh tắt</div>';
+                    return;
+                }
+                let html = '';
+                quickLinks.forEach(function(ql) {
+                    html += '<div class="ql-item" data-id="' + escHtml(ql.id) + '">' +
+                        '<a href="#" onclick="return runQuickCmd(this)" data-cmd="' + escAttr(ql.cmd) + '">' +
+                        '<span class="ql-label">' + escHtml(ql.name) + '</span>' +
+                        '<span class="ql-cmd">' + escHtml(ql.cmd) + '</span>' +
+                        '</a>' +
+                        '<button type="button" class="ql-del" title="Xóa" onclick="deleteQuickLink(\'' + escAttr(ql.id) + '\')">&times;</button>' +
+                        '</div>';
+                });
+                quickLinksEl.innerHTML = html;
+            }
+
+            function escAttr(s) {
+                if (s == null) return '';
+                return String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            function runQuickCmd(el) {
                 if (is_running) return false;
-                const path = el.getAttribute('data-path');
-                if (!path) return false;
-                inputEl.value = 'cd ' + path;
+                const cmd = el.getAttribute('data-cmd');
+                if (!cmd) return false;
+                inputEl.value = cmd;
                 runCommand();
                 return false;
             }
+
+            function postQuickLink(body) {
+                return fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams(body)
+                }).then(function(r) { return r.json(); });
+            }
+
+            function addQuickLink() {
+                const name = (qlNameEl.value || '').trim();
+                const cmd = (qlCmdEl.value || '').trim();
+                if (!name || !cmd) {
+                    alert('Nhập tên và lệnh CMD');
+                    return;
+                }
+                qlAddBtn.disabled = true;
+                postQuickLink({
+                    action: 'quicklink_add',
+                    name: name,
+                    cmd: cmd,
+                    token: CSRF_TOKEN
+                }).then(function(data) {
+                    if (!data.ok) {
+                        alert(data.error || 'Thêm thất bại');
+                        return;
+                    }
+                    qlNameEl.value = '';
+                    qlCmdEl.value = '';
+                    renderQuickLinks(data.links);
+                }).catch(function(err) {
+                    alert('Lỗi kết nối: ' + err.message);
+                }).finally(function() {
+                    qlAddBtn.disabled = false;
+                });
+            }
+
+            function deleteQuickLink(id) {
+                if (!id) return;
+                if (!confirm('Xóa lệnh tắt này?')) return;
+                postQuickLink({
+                    action: 'quicklink_delete',
+                    id: id,
+                    token: CSRF_TOKEN
+                }).then(function(data) {
+                    if (!data.ok) {
+                        alert(data.error || 'Xóa thất bại');
+                        return;
+                    }
+                    renderQuickLinks(data.links);
+                }).catch(function(err) {
+                    alert('Lỗi kết nối: ' + err.message);
+                });
+            }
+
+            function onQlFormKey(e) {
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    addQuickLink();
+                }
+            }
+            if (qlNameEl) qlNameEl.addEventListener('keydown', onQlFormKey);
+            if (qlCmdEl) qlCmdEl.addEventListener('keydown', onQlFormKey);
 
             function clearTerminal() {
                 // Giữ lại welcome, xóa các dòng sau

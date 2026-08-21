@@ -11,17 +11,18 @@ RedirectMatch 404 /\.git
 
 # --- Chặn truy cập vào các file cấu hình nhạy cảm ---
 # Dùng syntax Apache 2.4 (Require) thay vì 2.2 (Order/Allow/Deny)
-<FilesMatch "^(password\.php|\.env|\.htpasswd|.*\.json|.*\.log|.*\.bak|.*\.sql|.*\.sh)$">
+<FilesMatch "^(password\.php|\.env|\.htpasswd|.*\.json|.*\.xml|.*\.log|.*\.bak|.*\.sql|.*\.sh)$">
     Require all denied
 </FilesMatch>
 
 # Trả 404 thay vì 403 cho các file bị chặn (ẩn sự tồn tại)
 ErrorDocument 403 /remote/login123.php
 
-# --- Chặn truy cập thư mục config trực tiếp ---
+# --- Chặn truy cập thư mục config / xml trực tiếp ---
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^config/ - [F,L]
+    RewriteRule ^xml/ - [F,L]
 </IfModule>
 
 # --- Tắt hiển thị danh sách thư mục ---
